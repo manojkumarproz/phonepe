@@ -2,14 +2,20 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
-const crypto = require("crypto");
-
+const { StandardCheckoutClient, Env } = require("pg-sdk-node");
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 5001;
+
+const client = StandardCheckoutClient.getInstance(
+  process.env.CLIENT_ID,
+  process.env.CLIENT_SECRET,
+  1,
+  Env.SANDBOX // change to PRODUCTION later
+);
 
 const BASE_URL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
 
@@ -84,36 +90,40 @@ app.listen(PORT, () =>
   console.log(`🚀 Server running at http://localhost:${PORT}`)
 );
 
-function verifySignature(body, receivedSignature) {
-  const checksum = crypto
-    .createHmac("sha256", process.env.CLIENT_SECRET)
-    .update(JSON.stringify(body))
-    .digest("hex");
-
-  return checksum === receivedSignature;
-}
-
 /* ======================
-   WEBHOOK
+   WEBHOOK (SDK BASED)
 ====================== */
-app.post("/api/webhook", express.json(), (req, res) => {
-  const signature = req.headers["x-verify"] || "";
-  
-if (!signature || !verifySignature(req.body, signature)) {
-  return res.status(400).send("Invalid signature");
-}
+app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
+  try {
+    const authorizationHeader = req.headers["authorization"];
+    const responseBodyString = req.body; // raw string
 
-  if (!verifySignature(req.body, signature)) {
-    return res.status(400).send("Invalid signature");
+    const callbackResponse = client.validateCallback(
+      process.env.WEBHOOK_USER,   // username from dashboard
+      process.env.WEBHOOK_PASS,   // password from dashboard
+      authorizationHeader,
+      responseBodyString
+    );
+
+    console.log("✅ Callback verified:", callbackResponse);
+
+    const { orderId, state, amount } = callbackResponse.payload;
+
+    if (state === "COMPLETED") {
+      console.log("💰 Payment success:", orderId, amount);
+      // 👉 update DB here
+    }
+
+    if (state === "FAILED") {
+      console.log("❌ Payment failed:", orderId);
+    }
+
+    res.status(200).send("OK");
+
+  } catch (err) {
+    console.log("❌ Invalid callback:", err.message);
+    res.status(400).send("Invalid");
   }
-
-  console.log("✅ Signature verified");
-
-  const { merchantOrderId, state } = req.body;
-
-  if (state === "COMPLETED") {
-    console.log("Payment success:", merchantOrderId);
-  }
-
-  res.status(200).send("OK");
 });
+
+
