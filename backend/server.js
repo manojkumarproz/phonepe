@@ -6,7 +6,7 @@ const { StandardCheckoutClient, Env } = require("pg-sdk-node");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// app.use(express.json());
 
 const PORT = process.env.PORT || 5001;
 
@@ -126,6 +126,8 @@ console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
   }
 });
 
+
+app.use(express.json());
 
 // app.post("/api/webhook", (req, res) => {
 //   console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
