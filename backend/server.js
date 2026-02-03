@@ -106,7 +106,7 @@ app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
     const expectedHeader = `SHA256(${expectedHash})`;
 console.log("expectedHeader:", expectedHeader);
 
-    if (receivedAuth !== expectedHeader) {
+    if (receivedAuth !== expectedHash) {
       console.log("❌ Invalid authorization");
       return res.status(401).send("Unauthorized");
     }
