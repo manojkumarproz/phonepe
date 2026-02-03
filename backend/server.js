@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
-const { StandardCheckoutClient, Env } = require("pg-sdk-node");
+const crypto = require("crypto");
 const app = express();
 
 app.use(cors());
@@ -90,45 +90,60 @@ app.listen(PORT, () =>
 );
 
 /* ======================
-   WEBHOOK (SDK BASED)
+   WEBHOOK (MANUAL VERIFY)
 ====================== */
 app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
-console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
+  console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
+
   try {
-    console.log("from try block");
+    console.log("try block");
     
-    const authorizationHeader = req.headers["authorization"];
-    console.log("Authorization Header:", authorizationHeader);
-    
-    const responseBodyString = req.body; // raw string
-    console.log("Request Body:", responseBodyString);
-console.log("user", process.env.WEBHOOK_USER);
-console.log("pass", process.env.WEBHOOK_PASS);
+    const receivedAuth = req.headers["authorization"];
+    console.log("Auth:", receivedAuth);
+    const rawBody = req.body;
 
-    const callbackResponse = client.validateCallback(
-      process.env.WEBHOOK_USER,   // username from dashboard
-      process.env.WEBHOOK_PASS,   // password from dashboard
-      authorizationHeader,
-      responseBodyString
-    );
+    console.log("Raw body:", rawBody);
 
-    console.log("✅ Callback verified:", callbackResponse);
+    /* ---------- VERIFY AUTH ---------- */
+    const expectedHash = crypto
+      .createHash("sha256")
+      .update(`${process.env.WEBHOOK_USER}:${process.env.WEBHOOK_PASS}`)
+      .digest("hex");
+    console.log("Expected hash:", expectedHash);
+    const expectedHeader = `SHA256(${expectedHash})`;
+console.log("expectedHeader:", expectedHeader);
 
-    const { orderId, state, amount } = callbackResponse.payload;
-
-    if (state === "COMPLETED") {
-      console.log("💰 Payment success:", orderId, amount);
-      // 👉 update DB here
+    if (receivedAuth !== expectedHeader) {
+      console.log("❌ Invalid authorization");
+      return res.status(401).send("Unauthorized");
     }
 
-    if (state === "FAILED") {
-      console.log("❌ Payment failed:", orderId);
+    console.log("✅ Auth verified");
+
+    /* ---------- PARSE BODY ---------- */
+    const data = JSON.parse(rawBody);
+
+    const { event, payload } = data;
+
+    console.log("Event:", event);
+    console.log("Payload:", payload);
+
+    /* ---------- HANDLE EVENTS ---------- */
+
+    if (event === "checkout.order.completed") {
+      console.log("💰 PAYMENT SUCCESS:", payload.merchantOrderId);
+      // update DB → status = COMPLETED
+    }
+
+    if (event === "checkout.order.failed") {
+      console.log("❌ PAYMENT FAILED:", payload.merchantOrderId);
+      // update DB → status = FAILED
     }
 
     res.status(200).send("OK");
 
   } catch (err) {
-    console.log("❌ Invalid callback:", err.message);
+    console.log("❌ Webhook error:", err.message);
     res.status(400).send("Invalid");
   }
 });
