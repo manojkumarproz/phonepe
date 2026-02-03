@@ -102,6 +102,8 @@ console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
     
     const responseBodyString = req.body; // raw string
     console.log("Request Body:", responseBodyString);
+console.log("user", process.env.WEBHOOK_USER);
+console.log("pass", process.env.WEBHOOK_PASS);
 
     const callbackResponse = client.validateCallback(
       process.env.WEBHOOK_USER,   // username from dashboard
