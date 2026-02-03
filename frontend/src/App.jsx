@@ -2,7 +2,7 @@ function App() {
 
   const payNow = async () => {
     const res = await fetch(
-      "http://localhost:5001/api/pay",
+      `${import.meta.env.VITE_API_URL}/api/pay`,
       {
         method: "POST",   // ✅ change here
         headers: {

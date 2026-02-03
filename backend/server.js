@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
+const crypto = require("crypto");
 
 const app = express();
 
@@ -12,18 +13,21 @@ const PORT = process.env.PORT || 5001;
 
 const BASE_URL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
 
+
 /* ======================
    GET TOKEN
 ====================== */
 async function getToken() {
+  const body = new URLSearchParams({
+    client_id: process.env.CLIENT_ID,
+    client_secret: process.env.CLIENT_SECRET,
+    client_version: 1,
+    grant_type: "client_credentials",
+  });
+
   const res = await axios.post(
     "https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token",
-    {
-      client_id: process.env.CLIENT_ID,
-      client_secret: process.env.CLIENT_SECRET,
-      client_version: 1,
-      grant_type: "client_credentials",
-    },
+    body.toString(),
     {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -33,6 +37,7 @@ async function getToken() {
 
   return res.data.access_token;
 }
+
 
 /* ======================
    CREATE PAYMENT
@@ -78,3 +83,37 @@ app.post("/api/pay", async (req, res) => {
 app.listen(PORT, () =>
   console.log(`🚀 Server running at http://localhost:${PORT}`)
 );
+
+function verifySignature(body, receivedSignature) {
+  const checksum = crypto
+    .createHmac("sha256", process.env.CLIENT_SECRET)
+    .update(JSON.stringify(body))
+    .digest("hex");
+
+  return checksum === receivedSignature;
+}
+
+/* ======================
+   WEBHOOK
+====================== */
+app.post("/api/webhook", express.json(), (req, res) => {
+  const signature = req.headers["x-verify"] || "";
+  
+if (!signature || !verifySignature(req.body, signature)) {
+  return res.status(400).send("Invalid signature");
+}
+
+  if (!verifySignature(req.body, signature)) {
+    return res.status(400).send("Invalid signature");
+  }
+
+  console.log("✅ Signature verified");
+
+  const { merchantOrderId, state } = req.body;
+
+  if (state === "COMPLETED") {
+    console.log("Payment success:", merchantOrderId);
+  }
+
+  res.status(200).send("OK");
+});
