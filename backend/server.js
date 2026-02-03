@@ -10,13 +10,6 @@ app.use(cors());
 
 const PORT = process.env.PORT || 5001;
 
-const client = StandardCheckoutClient.getInstance(
-  process.env.CLIENT_ID,
-  process.env.CLIENT_SECRET,
-  1,
-  Env.SANDBOX // change to PRODUCTION later
-);
-
 const BASE_URL = "https://api-preprod.phonepe.com/apis/pg-sandbox";
 
 
