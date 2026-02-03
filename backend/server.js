@@ -96,7 +96,10 @@ app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
 console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
   try {
     const authorizationHeader = req.headers["authorization"];
+    console.log("Authorization Header:", authorizationHeader);
+    
     const responseBodyString = req.body; // raw string
+    console.log("Request Body:", responseBodyString);
 
     const callbackResponse = client.validateCallback(
       process.env.WEBHOOK_USER,   // username from dashboard
