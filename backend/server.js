@@ -95,6 +95,8 @@ app.listen(PORT, () =>
 app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
 console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
   try {
+    console.log("from try block");
+    
     const authorizationHeader = req.headers["authorization"];
     console.log("Authorization Header:", authorizationHeader);
     
