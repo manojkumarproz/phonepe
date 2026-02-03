@@ -92,42 +92,42 @@ app.listen(PORT, () =>
 /* ======================
    WEBHOOK (SDK BASED)
 ====================== */
-// app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
+app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
+console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
+  try {
+    const authorizationHeader = req.headers["authorization"];
+    const responseBodyString = req.body; // raw string
 
-//   try {
-//     const authorizationHeader = req.headers["authorization"];
-//     const responseBodyString = req.body; // raw string
+    const callbackResponse = client.validateCallback(
+      process.env.WEBHOOK_USER,   // username from dashboard
+      process.env.WEBHOOK_PASS,   // password from dashboard
+      authorizationHeader,
+      responseBodyString
+    );
 
-//     const callbackResponse = client.validateCallback(
-//       process.env.WEBHOOK_USER,   // username from dashboard
-//       process.env.WEBHOOK_PASS,   // password from dashboard
-//       authorizationHeader,
-//       responseBodyString
-//     );
+    console.log("✅ Callback verified:", callbackResponse);
 
-//     console.log("✅ Callback verified:", callbackResponse);
+    const { orderId, state, amount } = callbackResponse.payload;
 
-//     const { orderId, state, amount } = callbackResponse.payload;
+    if (state === "COMPLETED") {
+      console.log("💰 Payment success:", orderId, amount);
+      // 👉 update DB here
+    }
 
-//     if (state === "COMPLETED") {
-//       console.log("💰 Payment success:", orderId, amount);
-//       // 👉 update DB here
-//     }
+    if (state === "FAILED") {
+      console.log("❌ Payment failed:", orderId);
+    }
 
-//     if (state === "FAILED") {
-//       console.log("❌ Payment failed:", orderId);
-//     }
+    res.status(200).send("OK");
 
-//     res.status(200).send("OK");
-
-//   } catch (err) {
-//     console.log("❌ Invalid callback:", err.message);
-//     res.status(400).send("Invalid");
-//   }
-// });
-
-
-app.post("/api/webhook", (req, res) => {
-  console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
-  res.send("OK");
+  } catch (err) {
+    console.log("❌ Invalid callback:", err.message);
+    res.status(400).send("Invalid");
+  }
 });
+
+
+// app.post("/api/webhook", (req, res) => {
+//   console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
+//   res.send("OK");
+// });
