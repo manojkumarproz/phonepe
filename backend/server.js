@@ -3,10 +3,12 @@ const express = require("express");
 const axios = require("axios");
 const cors = require("cors");
 const crypto = require("crypto");
+const pool = require("./config/db");
+
 const app = express();
 
 app.use(cors());
-// app.use(express.json());
+app.use(express.json());
 
 const PORT = process.env.PORT || 5001;
 
@@ -46,18 +48,39 @@ app.post("/api/pay", async (req, res) => {
     const token = await getToken();   // ✅ FIXED
 
     const merchantOrderId = "ORD" + Date.now();
+    const { advpriceid } = req.body;
+
+    // 🔥 get real price from DB
+    const [rows] = await pool.execute(
+      "SELECT price FROM advprice WHERE id = ?",
+      [advpriceid]
+    );
+    if (!rows.length) {
+      return res.status(400).send("Invalid plan");
+    }
+
+    const price = rows[0].price;
+    const amount = Math.round(price * 100); // in paise
+
+    // 🔥 SAVE PAYMENT (PENDING)
+  await pool.execute(
+    `INSERT INTO payment
+    (advpriceid, payment_uuid, amount, paymentrefno, dateofpayment, paymentstatusid, status)
+    VALUES (?, ?, ?, ?, NOW(), ?, 1)`,
+    [advpriceid, merchantOrderId, amount, "", 5]
+  );
     
 
     const response = await axios.post(
       `${BASE_URL}/checkout/v2/pay`,
       {
         merchantOrderId,
-        amount: 1000,
+        amount: amount,
         paymentFlow: {
           type: "PG_CHECKOUT",
           message: "test payment",
           merchantUrls: {
-            redirectUrl: "http://localhost:5173/success",
+            redirectUrl: `http://localhost:5173/success?orderId=${merchantOrderId}`,
           }
         },
       },
@@ -78,14 +101,22 @@ app.post("/api/pay", async (req, res) => {
   }
 });
 
-app.listen(PORT, () =>
-  console.log(`🚀 Server running at http://localhost:${PORT}`)
-);
+app.get("/api/order-status/:id", async (req, res) => {
+  const [rows] = await pool.execute(`
+    SELECT ps.paymentstatusname
+    FROM payment p
+    JOIN paymentstatus ps ON ps.id = p.paymentstatusid
+    WHERE p.payment_uuid = ?
+  `, [req.params.id]);
+
+  res.json(rows[0] || { paymentstatusname: "Pending" });
+});
+
 
 /* ======================
    WEBHOOK (MANUAL VERIFY)
 ====================== */
-app.post("/api/webhook", express.text({ type: "*/*" }), (req, res) => {
+app.post("/api/webhook", express.text({ type: "*/*" }), async (req, res) => {
   console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
 
   try {
@@ -125,12 +156,24 @@ console.log("expectedHeader:", expectedHeader);
 
     if (event === "checkout.order.completed") {
       console.log("💰 PAYMENT SUCCESS:", payload.merchantOrderId);
-      // update DB → status = COMPLETED
+          await pool.execute(
+      `UPDATE payment
+      SET paymentstatusid = 3,
+          paymentrefno = ?,
+          dateofpayment = NOW()
+      WHERE payment_uuid = ?`,
+      [payload.transactionId || "", payload.merchantOrderId]
+    );
     }
 
     if (event === "checkout.order.failed") {
       console.log("❌ PAYMENT FAILED:", payload.merchantOrderId);
-      // update DB → status = FAILED
+        await pool.execute(
+      `UPDATE payment
+      SET paymentstatusid = 4
+      WHERE payment_uuid = ?`,
+      [payload.merchantOrderId]
+    );
     }
 
     res.status(200).send("OK");
@@ -142,9 +185,8 @@ console.log("expectedHeader:", expectedHeader);
 });
 
 
-app.use(express.json());
+// app.use(express.json());
 
-// app.post("/api/webhook", (req, res) => {
-//   console.log("🔥🔥 WEBHOOK HIT 🔥🔥");
-//   res.send("OK");
-// });
+app.listen(PORT, () =>
+  console.log(`🚀 Server running at http://localhost:${PORT}`)
+);
