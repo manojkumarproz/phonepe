@@ -44,6 +44,8 @@ async function getToken() {
    CREATE PAYMENT
 ====================== */
 app.post("/api/pay", async (req, res) => {
+  console.log("1111111");
+  
   try {
     const token = await getToken();   // ✅ FIXED
 
@@ -58,6 +60,7 @@ app.post("/api/pay", async (req, res) => {
     if (!rows.length) {
       return res.status(400).send("Invalid plan");
     }
+console.log("222222");
 
     const price = rows[0].price;
     const amount = Math.round(price * 100); // in paise
