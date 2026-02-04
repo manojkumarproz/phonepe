@@ -8,7 +8,7 @@ const pool = require("./config/db");
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+// app.use(express.json());
 
 const PORT = process.env.PORT || 5001;
 
@@ -188,7 +188,7 @@ console.log("expectedHeader:", expectedHeader);
 });
 
 
-// app.use(express.json());
+app.use(express.json());
 
 app.listen(PORT, () =>
   console.log(`🚀 Server running at http://localhost:${PORT}`)
