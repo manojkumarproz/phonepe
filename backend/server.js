@@ -139,10 +139,10 @@ app.post("/api/webhook", express.text({ type: "*/*" }), async (req, res) => {
       .update(`${process.env.WEBHOOK_USER}:${process.env.WEBHOOK_PASS}`)
       .digest("hex");
     console.log("Expected hash:", expectedHash);
-    const expectedHeader = `SHA256(${expectedHash})`;
+    const expectedHeader = expectedHash;
 console.log("expectedHeader:", expectedHeader);
 
-    if (receivedAuth !== expectedHash) {
+    if (receivedAuth !== expectedHeader) {
       console.log("❌ Invalid authorization");
       return res.status(401).send("Unauthorized");
     }
@@ -150,7 +150,7 @@ console.log("expectedHeader:", expectedHeader);
     console.log("✅ Auth verified");
 
     /* ---------- PARSE BODY ---------- */
-    const data = JSON.parse(rawBody);
+    const data = req.body;
 
     const { event, payload } = data;
 
